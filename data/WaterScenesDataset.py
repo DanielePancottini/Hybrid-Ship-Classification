@@ -62,7 +62,8 @@ class WaterScenesDataset(Dataset):
         # --- 1. Load Image ---
         img_path = os.path.join(self.image_dir, f"{file_id}.jpg")
         image = Image.open(img_path).convert('RGB')
-        original_image_size = image.size # (width, height)
+        w, h = image.size 
+        original_image_size = (h, w) # Pass (H, W) tuple
 
         # --- 2. Load 4D Radar Data ---
         radar_path = os.path.join(self.radar_dir, f"{file_id}.csv")

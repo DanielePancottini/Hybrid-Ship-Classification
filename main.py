@@ -122,6 +122,6 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.show()
         
-        if batch_idx == 1:  # Plot first 2 batches
+        if batch_idx == 10:  # Plot first 2 batches
             print("--- Test complete ---")
             break

@@ -26,12 +26,12 @@ class REVP_Transform(nn.Module):
         # Get original size for scaling ---
         H_orig, W_orig = int(original_image_size[0]), int(original_image_size[1])
 
-        u = radar_points[:, 0].to(device=device)
-        v = radar_points[:, 1].to(device=device)
-        rng = radar_points[:, 2].to(device=device)
-        elev = radar_points[:, 3].to(device=device)
-        vel = radar_points[:, 4].to(device=device)
-        power = radar_points[:, 5].to(device=device)
+        u = radar_points[:, 0]
+        v = radar_points[:, 1]
+        rng = radar_points[:, 2]
+        elev = radar_points[:, 3]
+        vel = radar_points[:, 4]
+        power = radar_points[:, 5]
 
         # Calculate scaling factors
         w_scale = self.W_target / W_orig
