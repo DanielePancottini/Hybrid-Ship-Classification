@@ -3,9 +3,10 @@ from matplotlib import pyplot as plt
 import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from backbone.radar.rc_net import RadarConv
 from data.WaterScenesDataset import WaterScenesDataset
 from data.WaterScenesDataset import collate_fn
-from ws_detr.revp import REVP_Transform
+from preprocess.revp import REVP_Transform
 
 # --- Set your paths ---
 DATASET_ROOT = "./data/WaterScenes"
@@ -48,6 +49,19 @@ train_loader = DataLoader(
     shuffle=True,
     num_workers=4,
     collate_fn=collate_fn
+)
+
+# Parameters
+in_channels = 4
+out_channels = 8
+stride = 1
+height = 680
+width = 680
+
+radar_conv_block = RadarConv(
+    in_channels=in_channels, 
+    out_channels=out_channels,
+    stride=stride
 )
 
 # (Set up val_loader similarly)
@@ -121,7 +135,15 @@ if __name__ == "__main__":
         plt.suptitle(f"Batch {batch_idx + 1}, Item 0")
         plt.tight_layout()
         plt.show()
-        
+
+        # Pass the input through the block
+        fdar = radar_conv_block(radars_batch)
+
+        # Check the output shape
+        # It should be (B, C_out, H, W)
+        print(f"Input shape (fr):  {radars_batch.shape}")
+        print(f"Output shape (fdar): {fdar.shape}")
+                
         if batch_idx == 10:  # Plot first 2 batches
             print("--- Test complete ---")
             break
