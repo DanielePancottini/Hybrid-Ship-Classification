@@ -1,3 +1,4 @@
+import math
 import os
 from matplotlib import pyplot as plt
 import numpy as np
@@ -6,6 +7,7 @@ from torchvision import transforms
 from backbone.radar.radar_encoder import RCNet, RCNetWithTransformer
 from data.WaterScenesDataset import WaterScenesDataset
 from data.WaterScenesDataset import collate_fn
+from detection.detection_head import NanoDetectionHead
 from preprocess.revp import REVP_Transform
 
 # --- Set your paths ---
@@ -68,6 +70,16 @@ rcnet_tf = RCNetWithTransformer(
     max_input_hw=680 # Set max_input_hw to 256 for this example
 )
 
+in_channels_list = [12, 24, 44]
+num_classes = 5
+head_width = 32
+
+ # --- Initialize Head ---
+head = NanoDetectionHead(
+    num_classes=num_classes,
+    in_channels_list=in_channels_list,
+    head_width=head_width
+)
 
 # (Set up val_loader similarly)
 
@@ -141,24 +153,22 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.show()
 
-        print("--- Testing original RCNet ---")
-        features_original = rcnet(radars_batch)
-        print("Original RCNet output shapes:")
-        for f in features_original:
-            print(f.shape)
-        
         print("\n--- Testing RCNetWithTransformer ---")
         features_transformed = rcnet_tf(radars_batch)
         print("Transformed RCNet output shapes:")
         for f in features_transformed:
             print(f.shape)
 
-        # 5. Verify shapes are the same
-        for f_orig, f_tf in zip(features_original, features_transformed):
-            assert f_orig.shape == f_tf.shape
+        print("\n--- Testing Detection Head ---")
+        s8_grids = math.ceil(680 / 8) ** 2
+        s16_grids = math.ceil(680 / 16) ** 2
+        s32_grids = math.ceil(680 / 32) ** 2
+        total_grid_cells = s8_grids + s16_grids + s32_grids
+
+        predictions = head(features_transformed)
+        print(f"Detections shape: {predictions.shape}, Total Grid: {total_grid_cells}, 5 + NumClasses: {5 + num_classes}")  # Should be [B, TotalGridCells, 5 + NumClasses]
         
-        print("\nSuccess! Output feature maps have the same shape.")
-                
+
         if batch_idx == 0:  # Plot first 2 batches
             print("--- Test complete ---")
             break
