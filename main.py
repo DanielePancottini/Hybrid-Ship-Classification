@@ -8,6 +8,7 @@ from backbone.radar.radar_encoder import RCNet, RCNetWithTransformer
 from data.WaterScenesDataset import WaterScenesDataset
 from data.WaterScenesDataset import collate_fn
 from detection.detection_head import NanoDetectionHead
+from model import RadarDetectionModel
 from preprocess.revp import REVP_Transform
 
 # --- Set your paths ---
@@ -18,7 +19,7 @@ TEST_FILE = os.path.join(DATASET_ROOT, "test.txt")
 
 # --- Define transforms ---
 # This is your final model input size
-TARGET_SIZE = (680, 680) 
+TARGET_SIZE = (320, 320) 
 
 # --- Image Transforms ---
 # (Unchanged from before)
@@ -57,8 +58,8 @@ train_loader = DataLoader(
 in_channels = 4
 out_channels = 8
 stride = 1
-height = 680
-width = 680
+height = 320
+width = 320
 
 rcnet = RCNet(in_channels)
 
@@ -67,7 +68,7 @@ rcnet_tf = RCNetWithTransformer(
     phi='S0',
     num_transformer_layers=2,
     num_heads=4,
-    max_input_hw=680 # Set max_input_hw to 256 for this example
+    max_input_hw=320 # Set max_input_hw to 256 for this example
 )
 
 in_channels_list = [12, 24, 44]
@@ -80,6 +81,9 @@ head = NanoDetectionHead(
     in_channels_list=in_channels_list,
     head_width=head_width
 )
+
+# --- Initialize Model ---
+model = RadarDetectionModel(backbone=rcnet_tf, detection_head=head)
 
 # (Set up val_loader similarly)
 
@@ -154,18 +158,14 @@ if __name__ == "__main__":
         plt.show()
 
         print("\n--- Testing RCNetWithTransformer ---")
-        features_transformed = rcnet_tf(radars_batch)
-        print("Transformed RCNet output shapes:")
-        for f in features_transformed:
-            print(f.shape)
+        predictions = model(radars_batch)
 
         print("\n--- Testing Detection Head ---")
-        s8_grids = math.ceil(680 / 8) ** 2
-        s16_grids = math.ceil(680 / 16) ** 2
-        s32_grids = math.ceil(680 / 32) ** 2
+        s8_grids = math.ceil(320 / 8) ** 2
+        s16_grids = math.ceil(320 / 16) ** 2
+        s32_grids = math.ceil(320 / 32) ** 2
         total_grid_cells = s8_grids + s16_grids + s32_grids
 
-        predictions = head(features_transformed)
         print(f"Detections shape: {predictions.shape}, Total Grid: {total_grid_cells}, 5 + NumClasses: {5 + num_classes}")  # Should be [B, TotalGridCells, 5 + NumClasses]
         
 
