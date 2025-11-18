@@ -163,6 +163,12 @@ class RCNetWithTransformer(nn.Module):
         transformed_features = []
 
         for i, feature in enumerate(features):
+
+            if i < 2: 
+                # For the first two large maps, just pass them through untouched
+                transformed_features.append(feature)
+                continue
+
             B, C, H, W = feature.shape
 
             # Add positional embedding

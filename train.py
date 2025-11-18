@@ -1,8 +1,8 @@
 import torch
-
 from torch.amp import GradScaler
 from torch.amp import autocast
 from detection.detection_loss import set_optimizer_lr
+from tqdm import tqdm
 
 class Trainer:
     def __init__(self, model, train_loader, val_loader, criterion, optimizer, epochs, device,
@@ -24,7 +24,11 @@ class Trainer:
     def train_epoch(self):
         self.model.train()
         running_loss = 0.0
-        for i, batch in enumerate(self.train_loader):
+
+        # Progress bar for training epoch
+        pbar = tqdm(self.train_loader, desc=f"Epoch {self.epoch+1}/{self.epochs} [Train]", leave=True)
+
+        for i, batch in enumerate(pbar):
             # set new lr for current step
             current_step = self.epoch * self.steps_per_epoch + i
             set_optimizer_lr(self.optimizer, self.lr_scheduler, current_step)

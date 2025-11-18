@@ -11,7 +11,6 @@ from data.WaterScenesDataset import WaterScenesDataset
 from data.WaterScenesDataset import collate_fn
 from detection.detection_head import NanoDetectionHead
 from model import RadarDetectionModel
-from preprocess.revp import REVP_Transform
 from train import Trainer
 import torch.optim as optim
 from detection.detection_loss import YOLOLoss, ModelEMA, get_lr_scheduler
@@ -27,7 +26,7 @@ TARGET_SIZE = (320, 320)
 NUM_CLASSES = 8 # Change this
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 EPOCHS = 5
-BATCH_SIZE = 32
+BATCH_SIZE = 8
 STRIDES = [8, 16, 32] # Must match your model's FPN/Head strides
 in_channels = 4
 out_channels = 8
@@ -42,114 +41,130 @@ INITIAL_LR = 0.03
 MOMENTUM = 0.937
 FP16 = True
 
-# --- Image Transforms ---
-# (Unchanged from before)
-image_transform = transforms.Compose([
-    transforms.Resize(TARGET_SIZE), 
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
+# --- 1. Add CuDNN Benchmark ---
+torch.backends.cudnn.benchmark = True
 
-# --- 1. Create the Datasets ---
-train_dataset = WaterScenesDataset(
-    root_dir=DATASET_ROOT,
-    split_file=TRAIN_FILE,
-    image_transform=image_transform,
-    # You can add transforms for radar or labels here
-)
-
-validation_dataset = WaterScenesDataset(
-    root_dir=DATASET_ROOT,
-    split_file=VAL_FILE,
-    image_transform=image_transform,
-    # You can add transforms for radar or labels here
-)
-
-# --- 2. Create the DataLoaders ---
-train_loader = DataLoader(
-    train_dataset,
-    batch_size=BATCH_SIZE,
-    shuffle=True,
-    num_workers=4,
-    collate_fn=collate_fn
-)
-
-val_loader = DataLoader(
-    validation_dataset,
-    batch_size=BATCH_SIZE,
-    shuffle=False,
-    num_workers=4,
-    collate_fn=collate_fn
-)
-
-# --- 3. Initialize the Model ---
-# Initialize RCNet Backbone
-rcnet = RCNet(in_channels)
-
-# Initialize RCNet with Transformer Backbone
-rcnet_tf = RCNetWithTransformer(
-    in_channels=in_channels, 
-    phi='S0',
-    num_transformer_layers=2,
-    num_heads=4,
-    max_input_hw=320 # Set max_input_hw to 256 for this example
-)
-
- # --- Initialize Head ---
-head = NanoDetectionHead(
-    num_classes=num_classes,
-    in_channels_list=in_channels_list,
-    head_width=head_width
-)
-
-# --- Initialize Model ---
-model = RadarDetectionModel(backbone=rcnet_tf, detection_head=head)
-
-if torch.cuda.device_count() > 1:
-    print(f"Using {torch.cuda.device_count()} GPUs for DataParallel.")
-    model = nn.DataParallel(model)
-
-model.to(DEVICE)
-    
-ema = ModelEMA(model)
-
-criterion = YOLOLoss(
-    num_classes=NUM_CLASSES,
-    strides=STRIDES,
-    fp16=FP16 
-).to(DEVICE)
-
-# --- 5. Optimizer ---
-optimizer = optim.SGD(model.parameters(), lr=INITIAL_LR, momentum=MOMENTUM)
-
-# --- Learning Rate Scheduler ---
-steps_per_epoch = len(train_loader)
-total_steps = EPOCHS * steps_per_epoch
-lr_scheduler = get_lr_scheduler(
-    lr_decay_type="cos",
-    lr=INITIAL_LR,
-    min_lr=INITIAL_LR * 0.01,
-    total_iters=total_steps,
-)
-
-# --- 6. Your Trainer (No changes needed) ---
-trainer = Trainer(
-    model=model,
-    train_loader=train_loader,
-    val_loader=val_loader,
-    criterion=criterion,
-    optimizer=optimizer,
-    epochs=EPOCHS,
-    device=DEVICE,
-    ema=ema,
-    lr_scheduler=lr_scheduler,
-    fp16=FP16
-)
-
-# (Set up val_loader similarly)
 
 #I want to test my dataloader
 if __name__ == "__main__":
+
+    
+    # Scale it
+    nbs = 64
+    lr_limit_max = 5e-2 
+    lr_limit_min = 5e-4
+
+    # Calculate safe LR for Batch Size 8
+    Init_lr_fit = min(max(BATCH_SIZE / nbs * INITIAL_LR, lr_limit_min), lr_limit_max)
+    Min_lr_fit = Init_lr_fit * 0.01
+
+    print(f"Scaled Learning Rate from {INITIAL_LR} to {Init_lr_fit} for BS={BATCH_SIZE}")
+
+    # --- Image Transforms ---
+    # (Unchanged from before)
+    image_transform = transforms.Compose([
+        transforms.Resize(TARGET_SIZE), 
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+    # --- 1. Create the Datasets ---
+    train_dataset = WaterScenesDataset(
+        root_dir=DATASET_ROOT,
+        split_file=TRAIN_FILE,
+        image_transform=image_transform,
+        # You can add transforms for radar or labels here
+    )
+
+    validation_dataset = WaterScenesDataset(
+        root_dir=DATASET_ROOT,
+        split_file=VAL_FILE,
+        image_transform=image_transform,
+        # You can add transforms for radar or labels here
+    )
+
+    # --- 2. Create the DataLoaders ---
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        num_workers=4,
+        collate_fn=collate_fn
+    )
+
+    val_loader = DataLoader(
+        validation_dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=collate_fn
+    )
+
+    # --- 3. Initialize the Model ---
+    # Initialize RCNet Backbone
+    rcnet = RCNet(in_channels)
+
+    # Initialize RCNet with Transformer Backbone
+    rcnet_tf = RCNetWithTransformer(
+        in_channels=in_channels, 
+        phi='S0',
+        num_transformer_layers=2,
+        num_heads=4,
+        max_input_hw=320 # Set max_input_hw to 256 for this example
+    )
+
+    # --- Initialize Head ---
+    head = NanoDetectionHead(
+        num_classes=num_classes,
+        in_channels_list=in_channels_list,
+        head_width=head_width
+    )
+
+    # --- Initialize Model ---
+    model = RadarDetectionModel(backbone=rcnet_tf, detection_head=head)
+
+    if torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs for DataParallel.")
+        model = nn.DataParallel(model)
+
+    model.to(DEVICE)
+        
+    ema = ModelEMA(model)
+
+    criterion = YOLOLoss(
+        num_classes=NUM_CLASSES,
+        strides=STRIDES,
+        fp16=FP16 
+    ).to(DEVICE)
+
+    # --- 5. Optimizer ---
+    optimizer = optim.SGD(model.parameters(), lr=INITIAL_LR, momentum=MOMENTUM)
+
+    # --- Learning Rate Scheduler ---
+    steps_per_epoch = len(train_loader)
+    total_steps = EPOCHS * steps_per_epoch
+    lr_scheduler = get_lr_scheduler(
+        lr_decay_type="cos",
+        lr=Init_lr_fit,
+        min_lr=Min_lr_fit,
+        total_iters=total_steps,
+    )
+
+    # --- 6. Your Trainer (No changes needed) ---
+    trainer = Trainer(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        criterion=criterion,
+        optimizer=optimizer,
+        epochs=EPOCHS,
+        device=DEVICE,
+        ema=ema,
+        lr_scheduler=lr_scheduler,
+        fp16=FP16
+    )
+
+    # (Set up val_loader similarly)
     
     print("Testing the DataLoader...")
     
