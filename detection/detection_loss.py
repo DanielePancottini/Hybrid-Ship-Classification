@@ -161,7 +161,7 @@ class YOLOLoss(nn.Module):
                     cls_preds_per_image, obj_preds_per_image,
                     expanded_strides, x_shifts, y_shifts,
                 )
-                torch.cuda.empty_cache()
+                
                 num_fg += num_fg_img
                 cls_target = F.one_hot(gt_matched_classes.to(torch.int64),
                                        self.num_classes).float() * pred_ious_this_matching.unsqueeze(-1)

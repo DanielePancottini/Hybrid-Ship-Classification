@@ -47,8 +47,8 @@ class Trainer:
             if self.ema is not None:
                 self.ema.update(self.model)
 
-            running_loss += loss.item()
-        epoch_loss = running_loss / len(self.train_loader)
+            running_loss += loss
+        epoch_loss = (running_loss / len(self.train_loader)).item()
         return epoch_loss
 
     def validate_epoch(self):

@@ -50,17 +50,11 @@ image_transform = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# --- Radar Transform ---
-# This is now just one clean step.
-# It handles creation AND resizing.
-radar_transform = REVP_Transform(target_size=TARGET_SIZE)
-
 # --- 1. Create the Datasets ---
 train_dataset = WaterScenesDataset(
     root_dir=DATASET_ROOT,
     split_file=TRAIN_FILE,
     image_transform=image_transform,
-    radar_transform=radar_transform,
     # You can add transforms for radar or labels here
 )
 
@@ -68,7 +62,6 @@ validation_dataset = WaterScenesDataset(
     root_dir=DATASET_ROOT,
     split_file=VAL_FILE,
     image_transform=image_transform,
-    radar_transform=radar_transform,
     # You can add transforms for radar or labels here
 )
 

@@ -12,7 +12,7 @@ class WaterScenesDataset(Dataset):
     Loads hybrid data (Image + 4D Radar) and corresponding 
     YOLO-format detection labels.
     """
-    def __init__(self, root_dir, split_file, image_transform=None, radar_transform=None, target_transform=None):
+    def __init__(self, root_dir, split_file, image_transform=None, target_transform=None):
         """
         Args:
             root_dir (str): Path to the main dataset directory.
@@ -24,16 +24,22 @@ class WaterScenesDataset(Dataset):
         """
         self.root_dir = root_dir
         self.image_transform = image_transform
-        self.radar_transform = radar_transform
         self.target_transform = target_transform
         
         # --- Define file paths ---
         self.image_dir = os.path.join(root_dir, 'image')
-        self.radar_dir = os.path.join(root_dir, 'radar')
+        self.radar_revp_dir = os.path.join(root_dir, 'radar_revp_npy')
         self.label_dir = os.path.join(root_dir, 'detection', 'yolo')
 
         # Load the file IDs (e.g., '000001', '000002') from the split file
         self.file_ids = self._load_file_ids(split_file)
+
+        # Add a check for the preprocessed folder ---
+        if not os.path.exists(self.radar_revp_dir):
+            raise FileNotFoundError(
+                f"Preprocessed radar directory not found: {self.radar_revp_dir}\n"
+                "Please run the `preprocess_data.py` script first."
+            )
 
     def _load_file_ids(self, split_file_path):
         """Helper function to read the .txt file and return a list of IDs."""
@@ -66,15 +72,17 @@ class WaterScenesDataset(Dataset):
         original_image_size = (h, w) # Pass (H, W) tuple
 
         # --- 2. Load 4D Radar Data ---
-        radar_path = os.path.join(self.radar_dir, f"{file_id}.csv")
+        radar_path = os.path.join(self.radar_revp_dir, f"{file_id}.npy")
         try:
-            radar_df = pd.read_csv(radar_path)
-            radar_points = radar_df[['u', 'v', 'range', 'elevation', 'doppler', 'power']].values
+            radar_revp_numpy = np.load(radar_path)
+            radar_tensor = torch.tensor(radar_revp_numpy, dtype=torch.float32)
         except Exception as e:
-            # print(f"Error loading radar file {radar_path}: {e}")
-            radar_points = np.empty((0, 6), dtype=np.float32)
-            
-        radar_tensor = torch.tensor(radar_points, dtype=torch.float32)
+            print(f"Error loading PRE-PROCESSED radar file {radar_path}: {e}")
+            # Fallback to an empty tensor with correct shape (C, H, W)
+            # Assuming your REVP transform outputs (4, 320, 320)
+            # Adjust C, H, W if this is wrong
+            C, H, W = 4, 320, 320 
+            radar_tensor = torch.zeros((C, H, W), dtype=torch.float32)
 
         # --- 3. Load Label (YOLO format) ---
         label_path = os.path.join(self.label_dir, f"{file_id}.txt")
@@ -101,8 +109,6 @@ class WaterScenesDataset(Dataset):
         # --- 4. Apply Transforms ---
         if self.image_transform:
             image = self.image_transform(image)
-        if self.radar_transform:
-            radar_tensor = self.radar_transform(radar_tensor, original_image_size)
         if self.target_transform:
             # Note: target_transform now operates on a [N_objects, 5] tensor
             label_tensor = self.target_transform(label_tensor)

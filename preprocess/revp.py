@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 class REVP_Transform(nn.Module):
-    def __init__(self, target_size=(680, 680)):
+    def __init__(self, target_size=(320, 320)):
         super().__init__()
         self.target_size = target_size
         self.H_target, self.W_target = int(target_size[0]), int(target_size[1])
