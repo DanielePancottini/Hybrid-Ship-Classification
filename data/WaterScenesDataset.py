@@ -52,7 +52,7 @@ class WaterScenesDataset(Dataset):
             random.shuffle(self.file_ids)
             
             # Select percentage (e.g., 0.20 for 20%)
-            subset_ratio = 0.20 
+            subset_ratio = 1.0 
             subset_size = int(len(self.file_ids) * subset_ratio)
             
             # Slice the list
@@ -150,6 +150,20 @@ class WaterScenesDataset(Dataset):
                             
             except Exception as e:
                 print(f"Error loading label file {label_path}: {e}")
+
+        """
+        # --- AUGMENTATION: Random Horizontal Flip ---
+        # 50% chance to flip
+        if torch.rand(1) < 0.5:
+            # Flip Radar (Shape: 4, H, W). Flip on last dim (Width)
+            radar_tensor = torch.flip(radar_tensor, dims=[-1])
+            
+            # Flip Box Coordinates
+            # YOLO Format: [class, x_center, y_center, w, h] (Absolute Pixels)
+            if len(labels) > 0:
+                # New X_center = Image_Width - Old_X_center
+                label_tensor[:, 1] = IMG_W - label_tensor[:, 1]
+        """
         
         # Convert to a tensor
         # If no objects, create an empty tensor of the correct shape [0, 5]

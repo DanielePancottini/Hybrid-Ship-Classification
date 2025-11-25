@@ -28,7 +28,7 @@ class RadarConv(nn.Module):
             )
         else:
             self.conv = nn.Conv2d(
-                out_channels, out_channels, kernel_size=3, stride=stride, padding= 3 // 2
+                in_channels, out_channels, kernel_size=3, stride=stride, padding= 3 // 2
             )
 
     def forward(self, x):
@@ -124,7 +124,8 @@ class RCNet(nn.Module):
         return x
     
 class RCNetWithTransformer(nn.Module):
-    def __init__(self, in_channels, phi='S0', num_transformer_layers=2, num_heads=4, max_input_hw=680):
+    def __init__(self, in_channels, phi='S0', num_transformer_layers=2, num_heads=4, max_input_hw=320,
+                 last_stages_only=True):
         super(RCNetWithTransformer, self).__init__()
 
         #initialize RCNet
@@ -166,6 +167,8 @@ class RCNetWithTransformer(nn.Module):
 
             self.transformer_blocks.append(transformer_encoder)
 
+            self.last_stages_only = last_stages_only
+
     def forward(self, x):
 
         # Pass input through RCNet to get multi-scale features
@@ -176,7 +179,7 @@ class RCNetWithTransformer(nn.Module):
 
         for i, feature in enumerate(features):
 
-            if i < 2: 
+            if i < 2 and self.last_stages_only: 
                 # For the first two large maps, just pass them through untouched
                 transformed_features.append(feature)
                 continue

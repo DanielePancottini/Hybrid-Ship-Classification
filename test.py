@@ -15,7 +15,7 @@ from data.WaterScenesDataset import WaterScenesDataset
 
 # --- Config ---
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-CHECKPOINT_PATH = "./checkpoints/rcnet_radar_detection_half_transformer.pth"
+CHECKPOINT_PATH = "./checkpoints/rcnet_radar_detection_half_transformer_transfer_learning.pth"
 DATASET_ROOT = os.path.abspath("./data/WaterScenes")
 TEST_FILE = os.path.join(DATASET_ROOT, "test.txt")
 

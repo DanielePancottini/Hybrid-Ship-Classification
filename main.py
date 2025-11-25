@@ -19,14 +19,14 @@ DATASET_ROOT = os.path.abspath("./data/WaterScenes")
 TRAIN_FILE = os.path.join(DATASET_ROOT, "train.txt")
 VAL_FILE = os.path.join(DATASET_ROOT, "val.txt")
 TEST_FILE = os.path.join(DATASET_ROOT, "test.txt")
-MODEL_SAVE_PATH = os.path.abspath("./checkpoints/rcnet_radar_detection_full_transformer.pth")
+MODEL_SAVE_PATH = os.path.abspath("./checkpoints/rcnet_radar_detection_half_transformer_transfer_learning_30e.pth")
 
 # --- Config ---
 TARGET_SIZE = (320, 320) 
 NUM_CLASSES = 7 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 EPOCHS = 10
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 STRIDES = [8, 16, 32] 
 IN_CHANNELS = 4
 IN_CHANNELS_LIST = [12, 24, 44]
@@ -166,6 +166,12 @@ if __name__ == "__main__":
     # --- Initialize Model ---
     model = RadarDetectionModel(backbone=rcnet_tf, detection_head=head)
     model.to(DEVICE)
+
+    # --- Load Weights ---
+    # LOAD WEIGHTS FROM PREVIOUS RUN
+    checkpoint = torch.load("./checkpoints/rcnet_radar_detection_half_transformer_20e.pth")
+    model.load_state_dict(checkpoint)
+    print("Loaded weights from previous training!")
         
     # EMA and Loss
     ema = ModelEMA(model)
