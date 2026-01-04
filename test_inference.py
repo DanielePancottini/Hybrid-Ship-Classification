@@ -6,14 +6,12 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from torchvision import transforms
 import torchvision
-
-# --- Imports from your project ---
 from backbone.radar.radar_encoder import RCNetWithTransformer
 from detection.detection_head import NanoDetectionHead
 from model import RadarDetectionModel
 from data.WaterScenesDataset import WaterScenesDataset
 
-# --- Config ---
+# Config
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CHECKPOINT_PATH = "./checkpoints/rcnet_radar_detection_half_transformer_transfer_learning.pth"
 DATASET_ROOT = os.path.abspath("./data/WaterScenes")
@@ -30,7 +28,6 @@ def decode_outputs(outputs, input_shape=(320, 320)):
     """
     Decodes the raw output of the model into [x1, y1, x2, y2, score, class]
     """
-    grids = []
     strides = [8, 16, 32]
     decoded_boxes = []
 
@@ -65,23 +62,19 @@ def non_max_suppression(prediction, conf_thres=0.25, nms_thres=0.45):
     Applies NMS to filter boxes.
     prediction: [Total_Anchors, 5 + Num_Classes]
     """
-    # 1. Filter by Objectness Confidence
+    # Filter by Objectness Confidence
     # obj_conf * cls_conf
     box_corner = prediction.new(prediction.shape)
     
-    # Convert cx, cy, w, h -> x1, y1, x2, y2
+    # Convert cx, cy, w, h to x1, y1, x2, y2
     box_corner[:, 0] = prediction[:, 0] - prediction[:, 2] / 2
     box_corner[:, 1] = prediction[:, 1] - prediction[:, 3] / 2
     box_corner[:, 2] = prediction[:, 0] + prediction[:, 2] / 2
     box_corner[:, 3] = prediction[:, 1] + prediction[:, 3] / 2
     prediction[:, :4] = box_corner[:, :4]
+    
+    # Score = Obj_Conf * Sigmoid(Best_Class_Score)
 
-    output = [None]
-    
-    # Get Score = Obj_Conf * Sigmoid(Best_Class_Score)
-    # Note: Your Head might calculate obj/cls differently. 
-    # Assuming the output is [x, y, w, h, obj, class1, class2...]
-    
     # Apply sigmoid to obj and classes
     obj_score = torch.sigmoid(prediction[:, 4])
     cls_score = torch.sigmoid(prediction[:, 5:])
@@ -116,7 +109,7 @@ def non_max_suppression(prediction, conf_thres=0.25, nms_thres=0.45):
     return torch.stack(results)
 
 def main():
-    # 1. Load Dataset (Validation)
+    # Load Dataset (Test Split)
     image_transform = transforms.Compose([
         transforms.Resize((320, 320)), 
         transforms.ToTensor(),
@@ -131,9 +124,7 @@ def main():
         radar_std=RADAR_STD
     )
 
-    # 2. Load Model
-    # IMPORTANT: Ensure this matches the architecture you trained with!
-    # If you used RCNetWithTransformer in main.py, keep it here.
+    # Load Model
     backbone = RCNetWithTransformer(in_channels=4, phi='S0', max_input_hw=320)
     head = NanoDetectionHead(num_classes=NUM_CLASSES, in_channels_list=[12, 24, 44], head_width=32)
     model = RadarDetectionModel(backbone, head).to(DEVICE)
@@ -142,7 +133,7 @@ def main():
     model.load_state_dict(torch.load(CHECKPOINT_PATH, map_location=DEVICE))
     model.eval()
 
-    # 3. Inference Loop (Show 3 random examples)
+    # Inference Loop (Show 3 random examples)
     indices = np.random.choice(len(dataset), 3, replace=False)
     
     for idx in indices:
@@ -152,8 +143,8 @@ def main():
         
         # Run Model
         with torch.no_grad():
-            preds = model(radar) # List of 3 tensors
-            decoded = decode_outputs(preds) # [1, 2100, 5+Nc]
+            preds = model(radar)
+            decoded = decode_outputs(preds) # [1, Total_Anchors, 5 + Num_Classes]
             results = non_max_suppression(decoded[0], CONF_THRESH, NMS_THRESH)
 
         # Load real image for plotting
@@ -174,7 +165,7 @@ def main():
                 label = f"Cls {int(cls_id)}: {score:.2f}"
                 cv2.putText(img_draw, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         else:
-            print(f"No objects detected for {file_id} (Try lowering CONF_THRESH)")
+            print(f"No objects detected for {file_id}")
 
         # Plot Radar + Result
         fig, ax = plt.subplots(1, 2, figsize=(12, 6))

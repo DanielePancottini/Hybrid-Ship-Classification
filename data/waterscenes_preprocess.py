@@ -4,17 +4,13 @@ import numpy as np
 import torch
 from tqdm import tqdm
 from pathlib import Path
-
-# --- IMPORTANT ---
-# Import your REVP_Transform class
-# Adjust the path if 'preprocess.revp' is incorrect.
 from preprocess.revp import REVP_Transform
 
-# --- Configuration ---
-DATASET_ROOT = os.path.abspath("./data/WaterScenes") # Your main dataset folder
-TARGET_SIZE = (320, 320)           # Must match your training config
+# Config
+DATASET_ROOT = os.path.abspath("./data/WaterScenes")
+TARGET_SIZE = (320, 320)  # H, W tuple
 
-# Define input directories
+# Define input directories and split files
 IMAGE_DIR = os.path.join(DATASET_ROOT, 'image')
 RADAR_DIR = os.path.join(DATASET_ROOT, 'radar')
 SPLIT_FILES = [
@@ -23,11 +19,10 @@ SPLIT_FILES = [
     os.path.join(DATASET_ROOT, "test.txt")
 ]
 
-# Define NEW output directory
+# Define new output directory
 RADAR_REVP_DIR = os.path.join(DATASET_ROOT, "radar_revp_npy")
 
 ORIGINAL_IMAGE_SIZE = (1080, 1920)  # H, W tuple
-# ---------------------
 
 def _load_file_ids(split_file_path):
     """Helper function to read a split file and return a list of IDs."""
@@ -51,15 +46,14 @@ def main():
     and saves the resulting tensor as a .npy file.
     """
     
-    # 1. Create the output directory if it doesn't exist
+    # Create the output directory if it doesn't exist
     os.makedirs(RADAR_REVP_DIR, exist_ok=True)
     print(f"Output directory created at: {RADAR_REVP_DIR}")
     
-    # 2. Initialize the REVP Transform
-    # This is the same transform you used in main.py
+    # Initialize the REVP Transform
     radar_transform = REVP_Transform(target_size=TARGET_SIZE)
 
-    # 3. Load all unique file IDs from train, val, and test splits
+    # Load all unique file IDs from train, val, and test splits
     all_file_ids = set()
     for f in SPLIT_FILES:
         ids = _load_file_ids(f)
@@ -67,19 +61,19 @@ def main():
     
     print(f"Found {len(all_file_ids)} unique samples to process.")
     
-    # 4. Loop over all files and process them
+    # Loop over all files and process them
     for file_id in tqdm(all_file_ids):
         
-        # --- Define paths ---
+        # Define paths for input CSV and output .npy
         csv_path = os.path.join(RADAR_DIR, f"{file_id}.csv")
         output_npy_path = os.path.join(RADAR_REVP_DIR, f"{file_id}.npy")
 
-        # --- Check if already processed ---
+        # Check if already processed
         if os.path.exists(output_npy_path):
             continue
 
         try:
-            # --- b) Load raw radar CSV (The slow part) ---
+            # Load raw radar CSV data
             try:
                 radar_df = pd.read_csv(csv_path)
                 radar_points = radar_df[['u', 'v', 'range', 'elevation', 'doppler', 'power']].values
@@ -89,11 +83,11 @@ def main():
             
             radar_tensor_raw = torch.tensor(radar_points, dtype=torch.float32)
 
-            # --- c) Apply the REVP transform (The CPU-intensive part) ---
+            # Apply the REVP transform to get the radar tensor
             # This converts [N, 6] points -> [4, H, W] tensor
             radar_revp_tensor = radar_transform(radar_tensor_raw, ORIGINAL_IMAGE_SIZE)
 
-            # --- d) Save the FINAL tensor as a .npy file ---
+            # Save the final tensor as a .npy file
             # Convert to numpy for saving
             radar_revp_numpy = radar_revp_tensor.numpy()
             np.save(output_npy_path, radar_revp_numpy)

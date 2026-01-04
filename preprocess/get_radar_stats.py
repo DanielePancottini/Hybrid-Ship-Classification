@@ -4,14 +4,14 @@ from tqdm import tqdm
 import os
 from data.WaterScenesDataset import WaterScenesDataset, collate_fn
 
-# --- Config ---
+# Config
 DATASET_ROOT = os.path.abspath("../data/WaterScenes")
 TRAIN_FILE = os.path.join(DATASET_ROOT, "train.txt")
 BATCH_SIZE = 16
 
 def calculate_stats():
     print("Initializing Training Dataset...")
-    # Note: We do NOT pass image_transform because we only care about Radar here
+    # We do NOT pass image_transform because we only care about radar
     train_dataset = WaterScenesDataset(
         root_dir=DATASET_ROOT,
         split_file=TRAIN_FILE
@@ -25,7 +25,7 @@ def calculate_stats():
         collate_fn=collate_fn
     )
 
-    print("Calculating mean and std (this may take a moment)...")
+    print("Calculating mean and std for radar data...")
     
     channels_sum = torch.zeros(4)
     channels_sq_sum = torch.zeros(4)
@@ -50,10 +50,10 @@ def calculate_stats():
     std = (channels_sq_sum / total_pixels - mean ** 2).sqrt()
 
     print("\n" + "="*30)
-    print("RESULTS TO COPY INTO MAIN.PY")
+    print("Radar Data Statistics")
     print("="*30)
-    print(f"RADAR_MEAN = {mean.tolist()}")
-    print(f"RADAR_STD  = {std.tolist()}")
+    print(f"Radar Mean = {mean.tolist()}")
+    print(f"Radar STD  = {std.tolist()}")
     print("="*30)
 
 if __name__ == "__main__":

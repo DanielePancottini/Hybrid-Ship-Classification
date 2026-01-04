@@ -56,14 +56,14 @@ class NanoDetectionHead(nn.Module):
         # Strides for each feature level
         self.strides = [8, 16, 32]
         
-        # --- Stem Layers ---
+        # Stem Layers
         # 1x1 DepthwiseSeparableConv (pointwise) to unify channels from FPN levels
         self.stems = nn.ModuleList([
             DepthwiseSeparableConv(in_c, self.head_width, kernel_size=1, stride=1)
             for in_c in self.in_channels_list
         ])
         
-        # --- Decoupled Branches (Shared Weights) ---
+        # Decoupled Branches
         
         # Classification Branch
         self.cls_convs = nn.Sequential(
@@ -102,29 +102,18 @@ class NanoDetectionHead(nn.Module):
                 nn.init.constant_(m.bias, bias_value)
 
     def forward(self, features):
-        """
-        Args:
-            features (list[torch.Tensor]): List of 3 feature maps
-                                           from the backbone.
-        
-        Returns:
-            torch.Tensor: A single tensor of all predictions concatenated.
-            Shape: [Batch, TotalGridCells, 5 + NumClasses]
-                   (TotalGridCells = H/8*W/8 + H/16*W/16 + H/32*W/32)
-                   The (5 + NumClasses) are [x, y, w, h, obj_conf, ...class_confs]
-        """
         all_predictions = []
         
         # Iterate over each feature level (P3, P4, P5)
         for i, x in enumerate(features):
-            # 1. Unify channels with the stem
+            # Unify channels with the stem
             x_stem = self.stems[i](x)
             
-            # 2. Pass through decoupled branches
+            # Pass through decoupled branches
             cls_feat = self.cls_convs(x_stem)
             reg_feat = self.reg_convs(x_stem)
             
-            # 3. Get predictions
+            # Get predictions
             cls_out = self.cls_pred(cls_feat)  # [B, NumClasses, H, W]
             reg_out = self.reg_pred(reg_feat)  # [B, 4, H, W]
             obj_out = self.obj_pred(reg_feat)  # [B, 1, H, W]

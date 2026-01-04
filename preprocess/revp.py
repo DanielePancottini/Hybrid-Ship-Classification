@@ -23,7 +23,7 @@ class REVP_Transform(nn.Module):
         if radar_points.shape[1] < 6:
             raise ValueError("radar_points must have at least 6 columns: u,v,range,elevation,velocity,power")
 
-        # Get original size for scaling ---
+        # Get original size for scaling
         H_orig, W_orig = int(original_image_size[0]), int(original_image_size[1])
 
         u = radar_points[:, 0]

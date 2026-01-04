@@ -14,14 +14,14 @@ import torch.optim as optim
 from detection.detection_loss import YOLOLoss, ModelEMA, get_lr_scheduler
 from PIL import Image
 
-# --- Set your paths ---
+# Path Configurations
 DATASET_ROOT = os.path.abspath("./data/WaterScenes")
 TRAIN_FILE = os.path.join(DATASET_ROOT, "train.txt")
 VAL_FILE = os.path.join(DATASET_ROOT, "val.txt")
 TEST_FILE = os.path.join(DATASET_ROOT, "test.txt")
 MODEL_SAVE_PATH = os.path.abspath("./checkpoints/rcnet_radar_detection_half_transformer_transfer_learning_30e.pth")
 
-# --- Config ---
+# Config
 TARGET_SIZE = (320, 320) 
 NUM_CLASSES = 7 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -37,21 +37,21 @@ FP16 = False
 RADAR_MEAN = [0.1127, -0.0019, -0.0012, 0.0272]
 RADAR_STD  = [3.1396,  0.2177,  0.0556,  0.6252]
 
-# --- Add CuDNN Benchmark ---
+# Add CuDNN Benchmark for performance
 torch.backends.cudnn.benchmark = True
 
 if __name__ == "__main__":
 
     print(f"Using Device: {DEVICE}")
     
-    # --- Image Transforms ---
+    # Image Transforms
     image_transform = transforms.Compose([
         transforms.Resize(TARGET_SIZE), 
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    # --- Create the Datasets ---
+    # Create the Datasets
     print("Initializing Datasets...")
 
     train_dataset = WaterScenesDataset(
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         radar_std=RADAR_STD
     )
 
-    # --- Create the DataLoaders ---
+    # Create the DataLoaders
     train_loader = DataLoader(
         train_dataset,
         batch_size=BATCH_SIZE,
@@ -91,9 +91,7 @@ if __name__ == "__main__":
         persistent_workers=True
     )
 
-    # ==========================================
-    #      VISUALIZE FIRST EXAMPLE ONLY
-    # ==========================================
+    # Visualization of First Dataset Example
     print("\n--- Visualizing First Dataset Example ---")
     
     # Fetch a single batch from the loader
@@ -143,9 +141,8 @@ if __name__ == "__main__":
     plt.show()
     print("Visualization closed. Proceeding to Model Setup...")
 
-    # ==========================================
-    #           MODEL SETUP & TRAIN
-    # ==========================================
+    # Model Setup
+    print("\n--- Setting up Model ---")
 
     # Initialize RCNet with Transformer Backbone
     rcnet_tf = RCNetWithTransformer(
@@ -156,19 +153,18 @@ if __name__ == "__main__":
         max_input_hw=320
     )
 
-    # --- Initialize Head ---
+    # Initialize Head
     head = NanoDetectionHead(
         num_classes=NUM_CLASSES,
         in_channels_list=IN_CHANNELS_LIST,
         head_width=HEAD_WIDTH
     )
 
-    # --- Initialize Model ---
+    # Initialize Model
     model = RadarDetectionModel(backbone=rcnet_tf, detection_head=head)
     model.to(DEVICE)
 
-    # --- Load Weights ---
-    # LOAD WEIGHTS FROM PREVIOUS RUN
+    # Load Weights from Previous Training
     checkpoint = torch.load("./checkpoints/rcnet_radar_detection_half_transformer_20e.pth")
     model.load_state_dict(checkpoint)
     print("Loaded weights from previous training!")
@@ -181,17 +177,17 @@ if __name__ == "__main__":
         fp16=FP16 
     ).to(DEVICE)
 
-    # --- Optimizer ---
+    # Optimizer
     optimizer = optim.SGD(model.parameters(), lr=INITIAL_LR, momentum=MOMENTUM, weight_decay=5e-4)
 
-    # --- Learning rate scaler ---
+    # Learning rate scaler
     nbs = 64
     lr_limit_max = 5e-2 
     lr_limit_min = 5e-4
     Init_lr_fit = min(max(BATCH_SIZE / nbs * INITIAL_LR, lr_limit_min), lr_limit_max)
     Min_lr_fit = Init_lr_fit * 0.01
 
-    # --- Learning Rate Scheduler ---
+    # Learning Rate Scheduler
     steps_per_epoch = len(train_loader)
     total_steps = EPOCHS * steps_per_epoch
     lr_scheduler = get_lr_scheduler(
@@ -201,7 +197,7 @@ if __name__ == "__main__":
         total_iters=total_steps,
     )
 
-    # --- Trainer ---
+    # Trainer
     trainer = Trainer(
         model=model,
         train_loader=train_loader,
