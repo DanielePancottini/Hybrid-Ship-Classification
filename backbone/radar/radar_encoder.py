@@ -5,10 +5,10 @@ import torch.nn as nn
 from backbone.radar.deformable_conv import DeformableConv2d
 
 image_encoder_width = {
-    'L': [40, 80, 192, 384],  # 26m 83.3% 6attn
-    'S2': [32, 64, 144, 288],  # 12m 81.6% 4attn dp0.02
-    'S1': [32, 48, 120, 224],  # 6.1m 79.0
-    'S0': [32, 48, 96, 176],  # 75.0 75.7
+    'L': [40, 80, 192, 384], 
+    'S2': [32, 64, 144, 288],  
+    'S1': [32, 48, 120, 224], 
+    'S0': [32, 48, 96, 176],  
 }
 
 

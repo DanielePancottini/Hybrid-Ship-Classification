@@ -11,7 +11,7 @@ BATCH_SIZE = 16
 
 def calculate_stats():
     print("Initializing Training Dataset...")
-    # We do NOT pass image_transform because we only care about radar
+    
     train_dataset = WaterScenesDataset(
         root_dir=DATASET_ROOT,
         split_file=TRAIN_FILE

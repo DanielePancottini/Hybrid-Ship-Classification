@@ -8,22 +8,25 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 import torchvision
 from PIL import Image
-
-# --- Imports from your project ---
-# Ensure these files exist in your python path
 from backbone.radar.radar_encoder import RCNetWithTransformer, RCNet 
 from detection.detection_head import NanoDetectionHead
 from model import RadarDetectionModel
 from data.WaterScenesDataset import WaterScenesDataset, collate_fn
 
-# ==========================================
-#               CONFIGURATION
-# ==========================================
+# Configuration
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATASET_ROOT = os.path.abspath("./data/WaterScenes")
 TEST_FILE = os.path.join(DATASET_ROOT, "test.txt")
+NUM_CLASSES = 7
+TARGET_SIZE = (320, 320)
+RADAR_MEAN = [0.1127, -0.0019, -0.0012, 0.0272]
+RADAR_STD  = [3.1396,  0.2177,  0.0556,  0.6252]
+CONF_THRESH = 0.05
+NMS_THRESH  = 0.45
+IOU_THRESH  = 0.25
+CLASS_NAMES = ["Pier", "Buoy", "Sailor", "Ship", "Boat", "Vessel", "Kayak"]
 
-# --- EXPERIMENT CONFIGURATION ---
+# Experiments to evaluate
 EXPERIMENTS = [
     {
         "name": "Half Transformer Model 20% Dataset 20 Epochs",
@@ -63,20 +66,7 @@ EXPERIMENTS = [
     }
 ]
 
-# Common Config
-NUM_CLASSES = 7
-TARGET_SIZE = (320, 320)
-RADAR_MEAN = [0.1127, -0.0019, -0.0012, 0.0272]
-RADAR_STD  = [3.1396,  0.2177,  0.0556,  0.6252]
-CONF_THRESH = 0.05
-NMS_THRESH  = 0.45
-IOU_THRESH  = 0.25
-CLASS_NAMES = ["Pier", "Buoy", "Sailor", "Ship", "Boat", "Vessel", "Kayak"]
-
-# ==========================================
-#           MODEL & BUILDER
-# ==========================================
-
+# Build Model Factory
 def build_model_from_config(config):
     """Factory function to build the correct model architecture"""
     in_channels = 4
@@ -87,7 +77,6 @@ def build_model_from_config(config):
     if backbone_type == 'RCNet':
         backbone = RCNet(in_channels=in_channels, phi=phi)
     elif backbone_type == 'RCNetWithTransformer':
-        # print(f"   -> Building RCNetWithTransformer (last_stages_only={last_stages_only})")
         backbone = RCNetWithTransformer(
             in_channels=in_channels, 
             phi=phi, 
@@ -103,10 +92,7 @@ def build_model_from_config(config):
     model = RadarDetectionModel(backbone, head)
     return model
 
-# ==========================================
-#           DETECTION UTILS
-# ==========================================
-
+# Detection Utilities
 def decode_outputs(outputs, strides=[8, 16, 32]):
     decoded = []
     for i, output in enumerate(outputs):
@@ -142,10 +128,7 @@ def non_max_suppression(prediction, conf_thres=0.25, nms_thres=0.45):
         output[image_i] = detections[keep]
     return output
 
-# ==========================================
-#           METRIC CALCULATION
-# ==========================================
-
+# Metric Computation
 def compute_ap(recall, precision):
     mrec = np.concatenate(([0.0], recall, [1.0]))
     mpre = np.concatenate(([1.0], precision, [0.0]))
@@ -198,10 +181,7 @@ def get_batch_statistics(outputs, targets, iou_threshold):
         
     return batch_metrics
 
-# ==========================================
-#           CORE EVALUATION LOOP
-# ==========================================
-
+# Evaluation Function
 def evaluate_experiment(experiment, test_loader):
     name = experiment['name']
     path = experiment['path']
@@ -268,6 +248,7 @@ def evaluate_experiment(experiment, test_loader):
     print(f"    -> mAP@0.25: {mAP:.4f}")
     return mAP, AP
 
+# Save Qualitative Results
 def save_qualitative_results(experiment, dataset, output_dir="report_figures"):
     """
     Saves a few example images with bounding boxes
@@ -326,12 +307,9 @@ def save_qualitative_results(experiment, dataset, output_dir="report_figures"):
         plt.savefig(f"{output_dir}/viz_{safe_name}_{file_id}.png")
         plt.close()
 
-# ==========================================
-#               MAIN EXECUTION
-# ==========================================
 if __name__ == "__main__":
     
-    # 1. Setup Data
+    # Data Preparation
     img_tf = transforms.Compose([
         transforms.Resize(TARGET_SIZE), 
         transforms.ToTensor(),
@@ -344,7 +322,7 @@ if __name__ == "__main__":
     results = {}
     os.makedirs("report_figures", exist_ok=True)
 
-    # 2. Run Experiments
+    # Run Experiments
     for exp in EXPERIMENTS:
         if os.path.exists(exp['path']):
             mAP, AP = evaluate_experiment(exp, test_loader)
@@ -354,7 +332,7 @@ if __name__ == "__main__":
         else:
             print(f"Skipping {exp['name']}: Path {exp['path']} not found.")
 
-    # 3. Visualization: Horizontal Bar Chart
+    # Visualization: Horizontal Bar Chart
     if results:
         names = list(results.keys())
         maps = [results[n]['mAP'] for n in names]
@@ -369,9 +347,9 @@ if __name__ == "__main__":
         # Create Horizontal Bars
         bars = ax.barh(y_pos, maps, color='steelblue', align='center', height=0.6)
         
-        # Invert Y-axis so the first list item is at the top
+        # Invert Y-axis to have the highest mAP on top
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(names, fontsize=10) # Full labels are readable here
+        ax.set_yticklabels(names, fontsize=10)
         ax.invert_yaxis()  
         
         ax.set_xlabel('mAP @ 0.25')
@@ -382,7 +360,7 @@ if __name__ == "__main__":
             width = bar.get_width()
             ax.annotate(f'{width:.4f}',
                         xy=(width, bar.get_y() + bar.get_height() / 2),
-                        xytext=(5, 0),  # 5 points padding to the right
+                        xytext=(5, 0), 
                         textcoords="offset points",
                         ha='left', va='center',
                         fontsize=10, fontweight='bold')
